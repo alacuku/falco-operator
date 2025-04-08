@@ -24,7 +24,7 @@ jobs:
   falco-operator:
     if: ${{ github.event_name == 'push' }}
     needs: docker-configure
-    uses: ./.github/workflows/docker-image.yaml
+    uses: ./.github/workflows/docker-image.yml
     secrets: inherit
     with:
       release: ${{ needs.docker-configure.outputs.release }}
@@ -36,7 +36,7 @@ jobs:
   artifact-operator:
     if: ${{ github.event_name == 'push' }}
     needs: docker-configure
-    uses: ./.github/workflows/docker-image.yaml
+    uses: ./.github/workflows/docker-image.yml
     secrets: inherit
     with:
       release: ${{ needs.docker-configure.outputs.release }}
