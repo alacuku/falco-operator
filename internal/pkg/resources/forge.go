@@ -38,6 +38,7 @@ func forgeMainContainer(defs *InstanceDefaults) *corev1.Container {
 		LivenessProbe:   defs.LivenessProbe,
 		ReadinessProbe:  defs.ReadinessProbe,
 		SecurityContext: defs.SecurityContext,
+		TTY:             defs.TTY,
 	}
 }
 

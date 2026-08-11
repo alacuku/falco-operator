@@ -179,9 +179,9 @@ func TestGenerateRole(t *testing.T) {
 		wantRuleCount int
 	}{
 		{
-			name:          "falco role has 5 rules",
+			name:          "falco role has 7 rules",
 			defs:          FalcoDefaults,
-			wantRuleCount: 5,
+			wantRuleCount: 7,
 		},
 		{
 			name:          "metacollector role has no rules",

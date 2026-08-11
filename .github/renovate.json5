@@ -1,0 +1,24 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+
+  // Dependabot (.github/dependabot.yml) already tracks go.mod and GitHub Actions. Renovate is
+  // only enabled here for the one thing Dependabot can't do: reading arbitrary version pins out
+  // of hack/versions.mk via a custom regex manager. Restricting enabledManagers avoids the two
+  // bots opening competing PRs for the same dependency.
+  enabledManagers: ["custom.regex"],
+
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["^hack/versions\\.mk$"],
+      // Each version line is preceded by a "# renovate: datasource=... depName=..." comment
+      // (see hack/versions.mk) — that's what tells Renovate which upstream release feed a bare
+      // "HELM_VERSION ?= v3.20.2" line actually corresponds to.
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+\\w+_VERSION\\s*\\?=\\s*(?<currentValue>\\S+)",
+      ],
+      versioningTemplate: "semver-coerced",
+    },
+  ],
+}

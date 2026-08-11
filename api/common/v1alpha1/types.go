@@ -47,6 +47,46 @@ const (
 	// - True: the artifact was programmed successfully.
 	// - False: the artifact could not be programmed.
 	ConditionProgrammed ConditionType = "Programmed"
+	// ConditionDependenciesSatisfied indicates whether the plugin's declared requirements are met by the
+	// running Falco instance.
+	// The possible status values for this condition type are:
+	// - True: all plugin requirements are satisfied; the plugin may be installed.
+	// - False: one or more requirements are not satisfied; the plugin will not be installed.
+	// - Unknown: the Falco API was unreachable; the check will be retried on the next reconcile.
+	ConditionDependenciesSatisfied ConditionType = "DependenciesSatisfied"
+	// ConditionOCIArtifactProgrammed indicates whether the OCI-sourced artifact has been successfully
+	// stored on the local filesystem. Used by plugin (binary) and rulesfile (OCI rules).
+	// The possible status values for this condition type are:
+	// - True: the artifact was fetched and stored (or verified unchanged on disk).
+	// - False: fetching or storing the artifact failed.
+	ConditionOCIArtifactProgrammed ConditionType = "OCIArtifactProgrammed"
+	// ConditionInlineArtifactProgrammed indicates whether the inline-sourced artifact has been
+	// successfully stored on the local filesystem. Used by rulesfile and config.
+	// The possible status values for this condition type are:
+	// - True: the artifact was stored (or verified unchanged on disk).
+	// - False: storing the artifact failed.
+	ConditionInlineArtifactProgrammed ConditionType = "InlineArtifactProgrammed"
+	// ConditionConfigMapArtifactProgrammed indicates whether the ConfigMap-sourced artifact has been
+	// successfully stored on the local filesystem. Used by rulesfile and config.
+	// The possible status values for this condition type are:
+	// - True: the artifact was stored (or verified unchanged on disk).
+	// - False: storing the artifact failed.
+	ConditionConfigMapArtifactProgrammed ConditionType = "ConfigMapArtifactProgrammed"
+	// ConditionConfigProgrammed indicates whether the shared plugin configuration file
+	// (plugins-config-inline.yaml) has been written for this plugin. Owned exclusively by ensurePluginConfig.
+	// The possible status values for this condition type are:
+	// - True: the config entry was written (or verified unchanged on disk).
+	// - False: writing the config entry failed.
+	ConditionConfigProgrammed ConditionType = "ConfigProgrammed"
+	// ConditionDeletionBlocked indicates whether removal of this node's artifact is being
+	// withheld because another artifact on the same node (e.g. a Rulesfile) still structurally
+	// depends on it. Set only by per-node artifact operators on the ArtifactNode they own; the
+	// instance-level aggregator surfaces it onto the parent artifact like any other condition.
+	// The possible status values for this condition type are:
+	// - True: removal is blocked; the message names the blocking dependent(s).
+	// - Absent: not blocked. This condition is only ever set while a removal is actually being
+	//   withheld; there is no corresponding False state to clear.
+	ConditionDeletionBlocked ConditionType = "DeletionBlocked"
 )
 
 // String returns the string representation of the condition type.
@@ -145,4 +185,56 @@ type ConfigMapRef struct {
 	// Name is the name of the ConfigMap.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+}
+
+// ArtifactMeta holds the parsed metadata for an artifact (requirements and dependencies
+// extracted from all sources). Written by the instance operator; read by per-node artifact
+// operators to check requirements without hitting the registry or re-parsing content.
+// +kubebuilder:object:generate=true
+type ArtifactMeta struct {
+	// Digest is the resolved OCI manifest digest of the currently observed artifact.
+	// +optional
+	Digest string `json:"digest,omitempty"`
+	// SpecHash is a SHA-256 hash of the OCIArtifact spec. When it changes the cached
+	// Digest, Requirements, and Dependencies are invalidated and re-fetched.
+	// +optional
+	SpecHash string `json:"specHash,omitempty"`
+	// Requirements lists the engine/capability requirements declared by the artifact.
+	// +optional
+	Requirements []ArtifactMetaRequirement `json:"requirements,omitempty"`
+	// Dependencies lists the plugin dependencies declared by the artifact.
+	// +optional
+	Dependencies []ArtifactMetaDependency `json:"dependencies,omitempty"`
+}
+
+// ArtifactMetaRequirement is a single engine or capability requirement declared by an artifact.
+// +kubebuilder:object:generate=true
+type ArtifactMetaRequirement struct {
+	// Name is the capability name (e.g. "engine_version_semver", "falco").
+	Name string `json:"name"`
+	// Version is the minimum required version string.
+	Version string `json:"version"`
+}
+
+// ArtifactMetaDependency is a plugin dependency declared by an artifact.
+// +kubebuilder:object:generate=true
+type ArtifactMetaDependency struct {
+	// Name is the plugin name.
+	Name string `json:"name"`
+	// Version is the minimum required plugin version.
+	Version string `json:"version"`
+	// Alternatives lists optional substitute plugins that can satisfy this dependency.
+	// +optional
+	Alternatives []ArtifactMetaDependencyVariant `json:"alternatives,omitempty"`
+}
+
+// ArtifactMetaDependencyVariant is an alternative plugin that can satisfy a dependency.
+// It is a flat (non-recursive) form of ArtifactMetaDependency so that CRD schemas
+// can express a concrete array-item type.
+// +kubebuilder:object:generate=true
+type ArtifactMetaDependencyVariant struct {
+	// Name is the plugin name.
+	Name string `json:"name"`
+	// Version is the minimum required plugin version.
+	Version string `json:"version"`
 }

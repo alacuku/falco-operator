@@ -1,0 +1,77 @@
+# Template for creating and asserting a Falco instance.
+#
+# The operator creates a DaemonSet (default) or Deployment depending on spec.type.
+# This template waits for Reconciled=True on the Falco CR (DaemonSet/Deployment created).
+# Available=True is NOT asserted here: mock Falco images never pass readiness in tests,
+# so the DaemonSet stays at 0 available replicas. Sidecar readiness is covered implicitly
+# by the subsequent artifact assertions (Programmed=True + file on disk).
+#
+# Required bindings:
+#   - falco_name: Name of the Falco CR to create.
+#   - namespace:  Namespace where the Falco instance will run.
+#
+# Required env vars (no fallback — the suite fails loudly if these aren't set, rather than
+# silently defaulting to some particular person's image):
+#   - CHAINSAW_FALCO_IMAGE
+#   - CHAINSAW_ARTIFACT_OPERATOR_IMAGE
+#
+# Optional bindings:
+#   - falco_type:              "DaemonSet" or "Deployment". Default: "DaemonSet".
+#   - falco_version:           Falco version to report in status. Default: "0.44.1".
+#   - falco_image:             Falco container image. Default: $CHAINSAW_FALCO_IMAGE env var.
+#   - artifact_operator_image: artifact-operator sidecar image. Default: $CHAINSAW_ARTIFACT_OPERATOR_IMAGE env var.
+#   - enforce_requirements:    Full --enforce-requirements flag. Default: "--enforce-requirements=true".
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: StepTemplate
+metadata:
+  name: apply-assert-falco
+spec:
+  bindings:
+    - name: falco_type
+      value: DaemonSet
+    - name: falco_version
+      value: "0.44.1"
+    - name: falco_image
+      value: (env('CHAINSAW_FALCO_IMAGE'))
+    - name: artifact_operator_image
+      value: (env('CHAINSAW_ARTIFACT_OPERATOR_IMAGE'))
+    - name: enforce_requirements
+      value: "--enforce-requirements=true"
+  try:
+    - apply:
+        resource:
+          apiVersion: instance.falcosecurity.dev/v1alpha1
+          kind: Falco
+          metadata:
+            name: ($falco_name)
+            namespace: ($namespace)
+          spec:
+            version: ($falco_version)
+            type: ($falco_type)
+            podTemplateSpec:
+              spec:
+                shareProcessNamespace: true
+                containers:
+                  - name: falco
+                    image: ($falco_image)
+                    tty: true
+                  - name: artifact-operator
+                    image: ($artifact_operator_image)
+                    imagePullPolicy: Never
+                    args:
+                      - ($enforce_requirements)
+                  - name: netshoot
+                    image: nicolaka/netshoot
+                    command: ["sleep", "infinity"]
+                    stdin: true
+                    tty: true
+    - assert:
+        resource:
+          apiVersion: instance.falcosecurity.dev/v1alpha1
+          kind: Falco
+          metadata:
+            name: ($falco_name)
+            namespace: ($namespace)
+          status:
+            ~.(conditions):
+              status: 'True'

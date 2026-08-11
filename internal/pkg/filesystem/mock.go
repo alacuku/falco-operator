@@ -20,10 +20,12 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"sync"
 )
 
-// MockFileSystem implements FileSystem for testing.
+// MockFileSystem implements FileSystem for testing. Every method locks mu, making it safe for concurrent use.
 type MockFileSystem struct {
+	mu           sync.Mutex
 	Files        map[string][]byte
 	StatErr      error
 	ReadErr      error
@@ -60,6 +62,8 @@ func NewMockFileSystem() *MockFileSystem {
 
 // Stat returns file info for the named file, or an error if it does not exist.
 func (m *MockFileSystem) Stat(name string) (fs.FileInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.statCalls = append(m.statCalls, name)
 	if m.StatErr != nil {
 		return nil, m.StatErr
@@ -72,6 +76,8 @@ func (m *MockFileSystem) Stat(name string) (fs.FileInfo, error) {
 
 // ReadFile reads and returns the contents of the named file.
 func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.readCalls = append(m.readCalls, name)
 	if m.ReadErr != nil {
 		return nil, m.ReadErr
@@ -85,6 +91,8 @@ func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
 
 // WriteFile writes data to the named file with the given permissions.
 func (m *MockFileSystem) WriteFile(name string, data []byte, perm fs.FileMode) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.WriteCalls = append(m.WriteCalls, writeCall{name: name, data: data, perm: perm})
 	if m.WriteErr != nil {
 		return m.WriteErr
@@ -95,6 +103,8 @@ func (m *MockFileSystem) WriteFile(name string, data []byte, perm fs.FileMode) e
 
 // Remove deletes the named file from the mock filesystem.
 func (m *MockFileSystem) Remove(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.RemoveCalls = append(m.RemoveCalls, name)
 	if err, ok := m.RemoveErrFor[name]; ok {
 		return err
@@ -108,6 +118,8 @@ func (m *MockFileSystem) Remove(name string) error {
 
 // Rename renames (moves) oldpath to newpath in the mock filesystem.
 func (m *MockFileSystem) Rename(oldpath, newpath string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.RenameCalls = append(m.RenameCalls, renameCall{oldpath: oldpath, newpath: newpath})
 	if m.RenameErr != nil {
 		return m.RenameErr
@@ -122,6 +134,8 @@ func (m *MockFileSystem) Rename(oldpath, newpath string) error {
 
 // Open opens the named file for reading and returns an io.ReadCloser.
 func (m *MockFileSystem) Open(name string) (io.ReadCloser, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.openCalls = append(m.openCalls, name)
 	if m.OpenErr != nil {
 		return nil, m.OpenErr
@@ -154,6 +168,8 @@ func (m *mockReadCloser) Close() error {
 
 // Exists checks if a file exists in the mock filesystem.
 func (m *MockFileSystem) Exists(path string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.StatErr != nil && !errors.Is(m.StatErr, fs.ErrNotExist) {
 		return false, m.StatErr
 	}

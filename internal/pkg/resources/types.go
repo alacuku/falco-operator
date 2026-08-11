@@ -62,6 +62,7 @@ type InstanceDefaults struct {
 	SecurityContext      *corev1.SecurityContext
 	PodSecurityContext   *corev1.PodSecurityContext
 	EnvVars              []corev1.EnvVar
+	TTY                  bool
 
 	// Tolerations
 	Tolerations []corev1.Toleration
